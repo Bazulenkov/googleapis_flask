@@ -1,16 +1,23 @@
 # -*- coding: utf-8 -*-
-
+import base64
 import os
-import flask
-import requests
 
+import flask
 import google.oauth2.credentials
 import google_auth_oauthlib.flow
 import googleapiclient.discovery
+import requests
+from dotenv import load_dotenv
+from email.mime.text import MIMEText
+from typing import Dict, List
+
+load_dotenv()
+
+TEST_RECIPIENT = os.getenv("test_recipient")
 
 # This variable specifies the name of a file that contains the OAuth 2.0
 # information for this application, including its client_id and client_secret.
-CLIENT_SECRETS_FILE = os.getenv("google_secret")
+CLIENT_SECRETS_FILE = os.path.join("secrets", "client_secret_gmail_web.json")
 
 # This OAuth 2.0 access scope allows for full read/write access to the
 # authenticated user's account and requires requests to use an SSL connection.
@@ -45,18 +52,26 @@ def test_api_request():
         **flask.session["credentials"]
     )
 
-    drive = googleapiclient.discovery.build(
+    service = googleapiclient.discovery.build(
         API_SERVICE_NAME, API_VERSION, credentials=credentials
     )
 
-    files = drive.files().list().execute()
-
+    test_message = _create_message(
+        sender="me",
+        to=TEST_RECIPIENT,
+        subject="Test mail",
+        message_text="Тестовое сообщение от flask через Gmail",
+    )
+    send_message = (
+        service.users().messages().send(userId="me", body=test_message)
+    )
+    response = send_message.execute()
     # Save credentials back to session in case access token was refreshed.
     # ACTION ITEM: In a production app, you likely want to save these
     #              credentials in a persistent database instead.
     flask.session["credentials"] = credentials_to_dict(credentials)
 
-    return flask.jsonify(**files)
+    return flask.jsonify(response)
 
 
 @app.route("/authorize")
@@ -76,6 +91,7 @@ def authorize():
         # Enable offline access so that you can refresh an access token without
         # re-prompting the user for permission. Recommended for web server apps.
         access_type="offline",
+        login_hint=OUR_EMAIL_ID,
         # Enable incremental authorization. Recommended as a best practice.
         include_granted_scopes="true",
     )
@@ -175,6 +191,42 @@ def print_index_table():
         + "    API request</a> again, you should go back to the auth flow."
         + "</td></tr></table>"
     )
+
+
+def _create_message(
+    sender: str,
+    to: str,
+    subject: str,
+    message_text: str,
+    attachments: List[str] = None,
+) -> Dict:
+    """Create a message for an email.
+
+    Args:
+        sender: Email address of the sender.
+        to: Email address of the receiver.
+        subject: The subject of the email message.
+        message_text: The text of the email message.
+        attachments: The paths to the files to be attached.
+
+    Returns:
+        An object containing a base64url encoded email object.
+    """
+    if not attachments:
+        mail = MIMEText(message_text)
+        mail["to"] = to
+        mail["from"] = sender
+        mail["subject"] = subject
+    # else:
+    #     mail = MIMEMultipart()
+    #     mail["to"] = to
+    #     mail["from"] = sender
+    #     mail["subject"] = subject
+    #     mail.attach(MIMEText(message_text))
+    #     for filename in attachments:
+    #         if filename and os.path.exists(filename):
+    #             self._add_attachment(mail, filename)
+    return {"raw": base64.urlsafe_b64encode(mail.as_bytes()).decode()}
 
 
 if __name__ == "__main__":

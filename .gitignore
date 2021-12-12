@@ -132,4 +132,4 @@ dmypy.json
 .vscode/
 
 # google secrets
-client_secret_gmail.json
+client_secret_gmail*.json
