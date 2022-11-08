@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import base64
 import os
+import json
+import time
 
 import flask
 import google.oauth2.credentials
@@ -71,6 +73,12 @@ def test_api_request():
     #              credentials in a persistent database instead.
     flask.session["credentials"] = credentials_to_dict(credentials)
 
+    # TODO delete временно сохраняю credentials в json-файл, чтоб удобно было смотреть.
+    timestr: str = time.strftime("%Y%m%d-%H%M%S")
+    filename: str = "gmail_credentials" + timestr + ".json"
+    with open(filename, "w") as file:
+        json.dump(credentials_to_dict(credentials), file, indent=4)
+
     return flask.jsonify(response)
 
 
@@ -116,6 +124,8 @@ def oauth2callback():
     # Use the authorization server's response to fetch the OAuth 2.0 tokens.
     authorization_response = flask.request.url
     flow.fetch_token(authorization_response=authorization_response)
+
+    # 'http://localhost:8080/oauth2callback?state=J9xe4ZoDHc4Jzfj7svatsdfHdwrwA6&code=4%2F0AX4XfWikxYRkp472uczLzDBPrQFVpWUQZhPzLkRxdMGKjC3oyprhtAXgyDfaMVdun8ZJbA&scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fgmail.send'
 
     # Store credentials in the session.
     # ACTION ITEM: In a production app, you likely want to save these
@@ -176,7 +186,7 @@ def print_index_table():
         + "<td>Submit an API request and see a formatted JSON response. "
         + "    Go through the authorization flow if there are no stored "
         + "    credentials for the user.</td></tr>"
-        + '<tr><td><a href="/authorize">Test the auth flow directly</a></td>'
+        + '<tr><td><a href="/mail/authorize">Test the auth flow directly</a></td>'
         + "<td>Go directly to the authorization flow. If there are stored "
         + "    credentials, you still might not be prompted to reauthorize "
         + "    the application.</td></tr>"
